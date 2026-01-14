@@ -2,7 +2,10 @@ module github.com/Pujan-khunt/clipboard-sync
 
 go 1.25.5
 
-require golang.design/x/clipboard v0.7.1
+require (
+	github.com/gorilla/websocket v1.5.3
+	golang.design/x/clipboard v0.7.1
+)
 
 require (
 	golang.org/x/exp/shiny v0.0.0-20250606033433-dcc06ee1d476 // indirect
