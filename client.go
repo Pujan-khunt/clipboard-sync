@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"golang.design/x/clipboard"
 )
@@ -19,7 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize clipboard: %v", err)
 	}
-	fmt.Println(">>  Clipboard Watcher Started. Copy text anywhere to see it here.")
+	fmt.Println(">> Clipboard Watcher Started. Copy text anywhere to see it here.")
 
 	// Start the watcher (listener)
 	// we receive a channel that will receive bytes whenever the clipboard changes with text(FmtText) data.
@@ -39,12 +40,29 @@ func main() {
 			lastSyncedContent = text
 
 			// Currently its being logged to stdout, later it will be sent to the websocket server.
-			log.Printf("[CAPTURED] Size: %d bytes | Content: %q\n", len(text), text)
+			log.Printf(">> [CAPTURED] Size: %d bytes | Content: %q\n", len(text), text)
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		for range ticker.C {
+			fakeNetworkData := fmt.Sprintf("Message from Phone at %v", time.Now().Format("15:04:05"))
+			log.Println(">> [NETWORK] Received update from other device. Writing to clipboard...")
+			updateClipboard(fakeNetworkData, clipboard.FmtText)
 		}
 	}()
 
 	// Keep the program alive until Ctrl+C
 	keepalive()
+}
+
+func updateClipboard(text string, format clipboard.Format) {
+	// Update state first to effectively pause the watcher logic for this specific string.
+	lastSyncedContent = text
+
+	// Write to system clipboard
+	clipboard.Write(format, []byte(text))
 }
 
 func keepalive() {
