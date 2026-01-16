@@ -1,12 +1,15 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	"sync"
 
 	"github.com/gorilla/websocket"
 )
+
+var addr = flag.String("addr", ":8080", "Port to listen on")
 
 // Specify parameters for converting a standard HTTP GET request into a WebSocket connection.
 var upgrader = websocket.Upgrader{
@@ -27,19 +30,22 @@ var hub = Hub{
 }
 
 func main() {
+	// Parse the CLI flags
+	flag.Parse()
+
 	// Define the main websocket endpoint
 	http.HandleFunc("/ws", handleConnections)
 
 	// Start the server
-	log.Println("Server started on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Printf("Server started on %s\n", *addr)
+	if err := http.ListenAndServe(*addr, nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	// Upgrade initial GET request to a WebSocket
-	ws, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,10 +59,11 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 	// Register the new client
 	hub.mu.Lock()
+	// Initialize an empty room if not already created.
 	if hub.rooms[roomID] == nil {
 		hub.rooms[roomID] = make(map[*websocket.Conn]bool)
 	}
-	hub.rooms[roomID][ws] = true
+	hub.rooms[roomID][conn] = true
 	hub.mu.Unlock()
 
 	log.Printf("New device connected to room: %s", roomID)
@@ -64,23 +71,23 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	// Cleanup when the client disconnects
 	defer func() {
 		hub.mu.Lock()
-		delete(hub.rooms[roomID], ws)
+		delete(hub.rooms[roomID], conn)
 		hub.mu.Unlock()
-		ws.Close()
+		conn.Close()
 		log.Printf("Device disconnected from room: %s", roomID)
 	}()
 
 	// The read loop (wait for clipboard updates)
 	for {
-		// ReadMessage will return a non-nil error when the WebSocket disconnects,
-		// effectively ending this infinite loop and running the cleanup function.
-		messageType, msg, err := ws.ReadMessage()
+		// ReadMessage will block until the data arrives or the connection closes
+		// in which case it will return a non-nil error.
+		messageType, msg, err := conn.ReadMessage() // messageType will be either websocket.TextMessage(for text) or websocket.BinaryMessage(for images)
 		if err != nil {
 			break
 		}
 
 		// Broadcast to every device in the same room except the sender.
-		broadcastToRoom(roomID, ws, messageType, msg)
+		broadcastToRoom(roomID, conn, messageType, msg)
 	}
 }
 
