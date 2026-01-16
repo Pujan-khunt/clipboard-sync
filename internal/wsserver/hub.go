@@ -1,0 +1,94 @@
+// Package wsserver implements the WebSocket server logic.
+// It functions as a centralized Hub that accepts connections, manages rooms
+// for device pairing, and broadcasts encrypted blobs between clients.
+package wsserver
+
+import (
+	"log"
+	"net/http"
+	"sync"
+
+	"github.com/gorilla/websocket"
+)
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
+// Hub manages rooms and client connections.
+type Hub struct {
+	rooms map[string]map[*websocket.Conn]bool // stores all the connected clients within the same room.
+	mu    sync.Mutex                          // Protects the map from concurrent access.
+}
+
+// NewHub creates a new thread-safe hub.
+func NewHub() *Hub {
+	return &Hub{
+		rooms: make(map[string]map[*websocket.Conn]bool),
+	}
+}
+
+func (h *Hub) HandleConnections(w http.ResponseWriter, r *http.Request) {
+	// Upgrade the connection from HTTP GET request to a WebSocket connection.
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("Upgrade error:", err)
+		return
+	}
+
+	// Identify the room
+	roomID := r.URL.Query().Get("room")
+	if roomID == "" {
+		roomID = "default"
+	}
+
+	// Register the client
+	h.mu.Lock()
+	if h.rooms[roomID] == nil {
+		h.rooms[roomID] = make(map[*websocket.Conn]bool)
+	}
+	h.rooms[roomID][ws] = true
+	h.mu.Unlock()
+
+	log.Printf("[Room: %s] New device connected", roomID)
+
+	// Cleanup on exit
+	defer func() {
+		h.mu.Lock()
+		delete(h.rooms[roomID], ws)
+		// Cleanup empty rooms
+		if len(h.rooms[roomID]) == 0 {
+			delete(h.rooms, roomID)
+		}
+		h.mu.Unlock()
+		ws.Close()
+		log.Printf("[Room: %s] Device disconnected", roomID)
+	}()
+
+	// Watch for changes from client and broadcast them.
+	for {
+		messageType, msg, err := ws.ReadMessage()
+		if err != nil {
+			break
+		}
+		h.broadcast(roomID, ws, messageType, msg)
+	}
+}
+
+func (h *Hub) broadcast(roomID string, sender *websocket.Conn, messageType int, msg []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for client := range h.rooms[roomID] {
+		if client == sender {
+			continue
+		}
+		if err := client.WriteMessage(messageType, msg); err != nil {
+			log.Printf("Write error: %v", err)
+			client.Close()
+			delete(h.rooms[roomID], client)
+		}
+	}
+}

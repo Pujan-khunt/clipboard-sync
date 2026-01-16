@@ -3,8 +3,15 @@
 An end-to-end encrypted, cross-platform and realtime clipboard synchronization tool.
 
 ## Project Structure
-- `cmd/server/main.go` - WebSocket server that manages clipboard synchronization rooms.
-- `cmd/client/main.go` - Client that watches clipboard and send/receives updates.
+- `cmd/` - Entry points for the applications.
+  - `client/main.go` - parses flags and starts the client app.
+  - `server/main.go` - parses flags and starts the server.
+- `internal/` - Private application logic.
+  - `client/` - Core client application logic and main loop.
+  - `clipboard/` - System clipboard access and echo cancellation logic.
+  - `crypto/` - AES-256-GCM encryption and key derivation.
+  - `wsserver/` - WebSocket hub and room management logic.
+  - `utils` - Utility functions.
 
 ## Usage
 
