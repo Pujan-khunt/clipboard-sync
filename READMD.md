@@ -1,4 +1,4 @@
-# Clipboard Synchronization Tool (P2P Edition)
+# Clipboard Synchronization Tool
 
 An end-to-end encrypted, cross-platform, peer-to-peer clipboard synchronization tool using WebRTC.
 
@@ -10,7 +10,7 @@ An end-to-end encrypted, cross-platform, peer-to-peer clipboard synchronization 
 │  (WebRTC)   │    (encrypted P2P)  │  (WebRTC)   │
 └──────┬──────┘                     └──────┬──────┘
        │                                   │
-       │ WebSocket (signaling only)        │
+       │    WebSocket (signaling only)     │
        │ ┌───────────────────────────────┐ │
        └─►       Signaling Server        ◄─┘
          │  (offers, answers, ICE)       │
