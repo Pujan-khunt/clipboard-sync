@@ -1,6 +1,5 @@
 // Package crypto implements the security layer for the clipboard synchronization usecase.
-// It uses AES-256-GCM for authenticated encryption and SHA-256 for key derivation,
-// ensuring that the server (hub) cannot read the clipboard contents.
+// It uses AES-256-GCM for authenticated encryption and SHA-256 for key derivation
 package crypto
 
 import (
@@ -8,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"fmt"
 	"io"
 )
 

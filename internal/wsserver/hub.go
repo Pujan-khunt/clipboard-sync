@@ -1,6 +1,7 @@
-// Package wsserver implements the WebSocket server logic.
-// It functions as a centralized Hub that accepts connections, manages rooms
-// for device pairing, and broadcasts encrypted blobs between clients.
+// Package wsserver implements the WebSocket signaling server for P2P clipboard sync.
+// It functions as a matchmaker that accepts connections, manages rooms for device
+// discovery, and broadcasts signaling messages (offers, answers, ICE candidates)
+// between clients. No clipboard data flows through this server.
 package wsserver
 
 import (
