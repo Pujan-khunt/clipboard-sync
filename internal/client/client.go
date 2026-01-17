@@ -86,6 +86,11 @@ func (a *App) Run() error {
 	}
 	log.Printf(">> Network: Connecting to signaling server %s...", u.String())
 
+	// Add peer id to query parameters
+	q := u.Query()
+	q.Set("peer_id", a.peerID)
+	u.RawQuery = q.Encode()
+
 	// Connect to the Signaling Server
 	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
