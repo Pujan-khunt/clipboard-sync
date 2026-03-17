@@ -45,3 +45,56 @@ As this response is sent to the server, the `gorilla/websocket` library uses the
 TCP socket which frees Go of the responsibility of managing this connection, essentially passing full control to the library.
 Hijacking is performed so the returned object of type `websocket.Conn` can be used for sending and receiving WebSocket frames.
 
+## Why Peer Discovery Without Signalling Server is Impossible?
+
+The core issue preventing two devices from connecting to each other on the internet is 
+**Network Address Translator (NAT)** 
+
+**NAT**: A device commonly found inside a router, it **rewrites** the source IP and Port values of an outgoing
+request from the local network and maintains a _Translation Table_ for incoming values to redirect to 
+the correct devices.
+
+![](https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/NAT_Concept-en.svg/1280px-NAT_Concept-en.svg.png)
+
+Most devices do not have a direct, public IP address, hence they sit behind a router which is assigned a private local IP address
+`192.168.1.5`. The router holds the single IP address for the whole network and all the devices behind it.
+
+If device A wants to connect to device B (assuming they are in completely separate networks), device A cannot simply send a
+packet to `192.168.1.5` since many devices share this local IP address worldwide. The solution is to send a packet to the 
+device B's router's public IP.
+
+The two problems in sending packets to a router (using its public IP):
+1. **Lack of Information**: Device A has no clue about what is the public IP of the router of Device B.
+2. **Firewall Protection**: Even if Device A knows the public IP of the router of the Device B and manages to send
+packets to it. Those packets will be dropped by the firewall, since routers are designed to drop unsolicited packets,
+unless device B explicitly initiated an outbound connection to Device A.
+
+These problems can be overcome using the method of **UDP Hole Punching** which requires a **Signalling Server**.
+
+It is a commonly accessible middleground for both clients to communicate, since the public IP is known.
+When both the devices are connected to the server the NAT for both clients create outbound rules in their
+translation table allowing the server to send responses back without getting blocked by the firewall.
+
+The firewall communicates the Source IP and Source Port of Device A (NAT of Device A) to the Device B and vice-versa.
+
+Now they can use **UDP Hole Punching** to trick the NAT into accepting traffic from each other, completely bypassing
+the signalling server for the actual data transfer.
+
+### UDP Hole Punching
+
+Routers which consists of NAT and stateful firewalls block incoming traffic by default if unsolicited.
+UDP hole punching begins by device A sending a packet to device B when the packet leaves the NAT A, it creates
+an outbound entry, thereby allowing packets from device B's public IP, if the device B sends packets at this moment
+then those packets will be accepted by device A's router and since the device B has sent packets from its NAT B
+it has created a similar outgoing entry which now allows packets from device A. Now we have a connection setup.
+
+### STUN (Session Traversal Utilities for NAT)
+
+In `client.go`, you define STUN servers in `getWebRTCConfig()` using Google provided free STUN servers (`stun:stun.1.google.com:19302`).
+When a `PeerConnection` is created, it sends a UDP packet to this Google server. The Google server replies with your public IP and port
+like `204.156.213.14:44921`.
+
+### ICE (Interactive Connectivity Establishment)
+
+STUN only shows your public IP. ICE gathers all the possible paths to reach your machine.
+Each path is called a _ICE Candidate_.

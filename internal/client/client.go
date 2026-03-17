@@ -100,10 +100,6 @@ func (a *App) Run() error {
 	defer a.conn.Close()
 	log.Printf(">> Network: Connected to signaling server (PeerID: %s)", a.peerID)
 
-	// Use a context for graceful cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Announce presence to the room
 	if err := a.sendSignal(&signaling.Message{
 		Type:     signaling.TypeJoin,
@@ -111,6 +107,10 @@ func (a *App) Run() error {
 	}); err != nil {
 		return fmt.Errorf("failed to announce presence: %w", err)
 	}
+
+	// Use a context for graceful cancellation
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Start signaling handler and clipboard watcher
 	go a.handleSignaling(ctx)
@@ -204,6 +204,8 @@ func (a *App) initiateConnection(remotePeerID string) {
 	}
 
 	// Create DataChannel (initiator creates it)
+	// the default options (nil) ensures the UDP packets maintain ordering
+	// which is crucial for clipboard data to be consistently synced through different machines
 	dc, err := pc.CreateDataChannel("clipboard", nil)
 	if err != nil {
 		log.Printf("Failed to create DataChannel: %v", err)
