@@ -34,6 +34,8 @@ func NewHub() *Hub {
 
 func (h *Hub) HandleConnections(w http.ResponseWriter, r *http.Request) {
 	// Upgrade the connection from HTTP GET request to a WebSocket connection.
+	// Hijacks the underlying TCP socket used for establishing the HTTP request which only
+	// communicates using WebSocket frames.
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade error:", err)
@@ -62,7 +64,7 @@ func (h *Hub) HandleConnections(w http.ResponseWriter, r *http.Request) {
 	h.rooms[roomID][peerID] = ws
 	h.mu.Unlock()
 
-	log.Printf("[Room: %s] Peer: %s connected", roomID)
+	log.Printf("[Room: %s] Peer: %s connected", roomID, peerID)
 
 	// Cleanup on exit
 	defer func() {
@@ -100,11 +102,10 @@ func (h *Hub) broadcast(roomID string, sender *websocket.Conn, messageType int, 
 	if err == nil && signallingMsg.ToPeer != "" {
 		if targetConn, exists := h.rooms[roomID][signallingMsg.ToPeer]; exists {
 			if err := targetConn.WriteMessage(messageType, msg); err != nil {
-				log.Printf("Write error to %s: %v", signallingMsg.ToPeer, err)
+				log.Printf("peer disconnected with id: %s: %v", signallingMsg.ToPeer, err)
 				targetConn.Close()
 				delete(h.rooms[roomID], signallingMsg.ToPeer)
 			}
-
 		}
 		return
 	}
